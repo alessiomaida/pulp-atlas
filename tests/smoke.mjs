@@ -30,7 +30,7 @@ try {
   const before=await page.evaluate(()=>({
     pulp:window.__pulpAtlasDebug.position("pulp"),
     neighbor:window.__pulpAtlasDebug.position("misirlou"),
-    rendered:window.__pulpAtlasDebug.screenPosition("pulp")
+    rendered:(()=>{const pos=window.__pulpAtlasDebug.screenPosition("pulp"),rect=document.querySelector("#graph").getBoundingClientRect();return {x:rect.left+pos.x,y:rect.top+pos.y};})()
   }));
   await page.mouse.move(before.rendered.x,before.rendered.y);
   await page.mouse.down();
