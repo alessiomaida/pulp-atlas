@@ -188,3 +188,6 @@ button:disabled { cursor: default; opacity: .45 }
 /* Keep the graph unobstructed by the editorial panel on desktop. */
 @media (min-width: 901px) { .panel-open #graph { right: 390px; } }
 @media (min-width: 901px) and (max-width: 1180px) { .panel-open #graph { right: 350px; } }
+
+#graph { cursor: grab; touch-action: none; }
+#graph:active { cursor: grabbing; }
