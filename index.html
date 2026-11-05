@@ -13,6 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.4/dist/cytoscape.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" defer></script>
   <script src="./data.js" defer></script>
+  <script src="./extended-data.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
 <body>
@@ -37,11 +38,7 @@
 
     <main class="atlas">
       <div class="controlbar" aria-label="Filtri della mappa">
-        <div class="control-group view-tabs" role="group" aria-label="Modalità">
-          <button id="exploreMode" class="tab active" aria-pressed="true"><span class="tab-icon">◎</span> Esplora</button>
-          <button id="overviewMode" class="tab" aria-pressed="false"><span class="tab-icon">⠿</span> Panoramica</button>
-        </div>
-        <span class="control-divider"></span>
+        <div class="map-view-label"><span class="live-mark">✳</span> MAPPA COMPLETA <small>Seleziona un nodo per centrarlo</small></div>
         <div class="control-group rel-group" role="group" aria-label="Tipo di connessione">
           <button class="filter-chip selected" data-rel="all" aria-pressed="true">Tutte le relazioni</button>
           <button class="filter-chip" data-rel="reference" aria-pressed="false"><span class="dot gold"></span> Riferimenti</button>
@@ -65,14 +62,14 @@
 
         <div class="map-hint" id="mapHint">
           <span class="hint-mark">↗</span>
-          <span>Trascina un nodo: gli altri reagiscono come una rete elastica. Clicca i nodi o le linee per esplorare.</span>
+          <span>Clicca un nodo per portarlo al centro. Trascinalo per muovere la rete elastica. Clicca una linea per vedere la fonte.</span>
           <button id="dismissHint" aria-label="Chiudi suggerimento">×</button>
         </div>
 
         <div class="map-controls">
           <button class="map-control" id="zoomIn" title="Zoom avanti" aria-label="Zoom avanti">+</button>
           <button class="map-control" id="zoomOut" title="Zoom indietro" aria-label="Zoom indietro">−</button>
-          <button class="map-control map-fit" id="fitGraph" title="Centra la mappa" aria-label="Centra la mappa">⤢</button>
+          <button class="map-control map-fit" id="fitGraph" title="Mostra tutta la mappa" aria-label="Mostra tutta la mappa">⤢</button>
         </div>
 
         <div class="map-footer">
@@ -98,7 +95,7 @@
     <p>La mappa mostra una porzione della rete culturale, non tutti i dati contemporaneamente. Parti da <strong>Pulp Fiction</strong> e segui citazioni, musiche, crediti e influenze.</p>
     <div class="help-row"><span>01</span><p><strong>Clicca un nodo</strong> per leggere dettagli, immagini e contenuti multimediali.</p></div>
     <div class="help-row"><span>02</span><p><strong>Clicca una linea</strong> per conoscere il motivo della connessione e aprire la fonte.</p></div>
-    <div class="help-row"><span>03</span><p><strong>Esplora da qui</strong> o fai doppio clic su un nodo per rifocalizzare la rete. Il percorso rimane visibile.</p></div>
+    <div class="help-row"><span>03</span><p><strong>Esplora da qui</strong> per portarlo al centro della mappa. Il percorso rimane visibile.</p></div>
     <div class="help-row"><span>04</span><p><strong>Filtra</strong> per credits, riferimenti, influenze o disciplina. Usa Panoramica per vedere la rete completa.</p></div>
     <button class="primary-btn" id="startExploring">Inizia a esplorare →</button>
   </dialog>
