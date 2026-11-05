@@ -184,3 +184,7 @@ button:disabled { cursor: default; opacity: .45 }
   .media-hero{height:145px}
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important} }
+
+/* Keep the graph unobstructed by the editorial panel on desktop. */
+@media (min-width: 901px) { .panel-open #graph { right: 390px; } }
+@media (min-width: 901px) and (max-width: 1180px) { .panel-open #graph { right: 350px; } }
