@@ -259,7 +259,7 @@
     highlightSelection(currentSelection);
   }
 
-  let recenterTimer=null;
+  let recenterTimer=null, initialPanelRender=true;
   function recenterOn(id,animate=true) {
     if(!cy)return;
     const element=cy.$id(id);
@@ -283,6 +283,7 @@
     $("detailPanel").classList.toggle("closed",!open);
     document.documentElement.classList.toggle("panel-open",open);
     if(recenterTimer)clearTimeout(recenterTimer);
+    if(initialPanelRender){initialPanelRender=false;return;}
     recenterTimer=setTimeout(()=>{
       if(!cy)return;
       cy.resize();
@@ -358,25 +359,31 @@
     const wikiNodes=atlas.nodes.filter(n=>n.wiki);
     const titleOf=n=>decodeURIComponent(n.wiki).replace(/_/g," ");
     const key=s=>String(s).replace(/_/g," ").trim().toLocaleLowerCase();
-    const params=new URLSearchParams({
-      action:"query",format:"json",formatversion:"2",origin:"*",
-      redirects:"1",prop:"pageimages",piprop:"thumbnail",
-      pithumbsize:"360",pilicense:"any",
-      titles:[...new Set(wikiNodes.map(titleOf))].join("|")
-    });
-    const response=await fetch("https://en.wikipedia.org/w/api.php?"+params,{mode:"cors"});
-    if(!response.ok)throw new Error("Wikipedia image API unavailable");
-    const json=await response.json();
-    const aliases=new Map();
-    for(const pair of [...(json.query?.normalized||[]),...(json.query?.redirects||[])])
-      aliases.set(key(pair.from),key(pair.to));
-    const pageByTitle=new Map((json.query?.pages||[]).map(page=>[key(page.title),page]));
-    for(const node of wikiNodes){
-      let title=key(titleOf(node));
-      for(let i=0;i<4&&aliases.has(title);i++)title=aliases.get(title);
-      const page=pageByTitle.get(title);
-      const src=page?.thumbnail?.source;
-      if(src)updateVisualImage(node,src,"Wikipedia");
+    // MediaWiki's anonymous API limits titles per request; issue batches of 30.
+    for(let start=0;start<wikiNodes.length;start+=30){
+      const batch=wikiNodes.slice(start,start+30);
+      const params=new URLSearchParams({
+        action:"query",format:"json",formatversion:"2",origin:"*",
+        redirects:"1",prop:"pageimages",piprop:"thumbnail",
+        pithumbsize:"300",
+        titles:[...new Set(batch.map(titleOf))].join("|")
+      });
+      try{
+        const response=await fetch("https://en.wikipedia.org/w/api.php?"+params,{mode:"cors"});
+        if(!response.ok)throw new Error("Wikipedia response "+response.status);
+        const json=await response.json();
+        if(json.error)throw new Error(json.error.info);
+        const aliases=new Map();
+        for(const pair of [...(json.query?.normalized||[]),...(json.query?.redirects||[])])
+          aliases.set(key(pair.from),key(pair.to));
+        const pageByTitle=new Map((json.query?.pages||[]).map(page=>[key(page.title),page]));
+        for(const node of batch){
+          let title=key(titleOf(node));
+          for(let i=0;i<4&&aliases.has(title);i++)title=aliases.get(title);
+          const src=pageByTitle.get(title)?.thumbnail?.source;
+          if(src)updateVisualImage(node,src,"Wikipedia");
+        }
+      }catch(error){console.warn("Wikipedia thumbnail batch failed:",error);}
     }
   }
 
@@ -469,6 +476,15 @@
     if(!fromHistory){
       const existing=history.indexOf(id);
       history=existing>=0 ? history.slice(0,existing+1) : [...history,id].slice(-12);
+    }
+    if(cy && !cy.$id(id).length){
+      // Search may target a filtered-out item. Reveal it in the same map.
+      relation="all";enabledTypes=new Set(types);renderDomains();
+      document.querySelectorAll(".filter-chip").forEach(b=>{
+        const active=b.dataset.rel==="all";b.classList.toggle("selected",active);
+        b.setAttribute("aria-pressed",String(active));
+      });
+      renderGraph();
     }
     if(cy){
       cy.nodes().removeClass("focus");
