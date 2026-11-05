@@ -8,7 +8,7 @@
   const typeOrder = Object.fromEntries(types.map((t,i) => [t,i]));
   const allConnections = atlas.links;
   const imageCache = new Map();
-  let cy, mode = "explore", relation = "all", focus = "pulp", history = ["pulp"];
+  let cy, mode = "overview", relation = "all", focus = "pulp", history = ["pulp"];
   let shownLimit = 12, enabledTypes = new Set(types), currentSelection = {type:"node",id:"pulp"};
   let searchMatches = [], lastTap = {id:"",at:0};
   let simulation = null, physicsNodes = new Map(), syncingPhysics = false;
@@ -95,12 +95,7 @@
       point.fx=null;point.fy=null;
       simulation.alphaTarget(0).alpha(.19).restart();
     });
-    cy.on("tap","node", ev => {
-      const id = ev.target.id(), now = Date.now();
-      if (lastTap.id===id && now-lastTap.at<380) navigateTo(id);
-      else showNode(id);
-      lastTap = {id,at:now};
-    });
+    cy.on("tap","node", ev => navigateTo(ev.target.id()));
     cy.on("tap","edge", ev => showEdge(ev.target.id()));
     cy.on("mouseover","node, edge",()=>{$("graph").style.cursor="grab"});
     cy.on("mouseout","node, edge",()=>{$("graph").style.cursor="grab"});
@@ -108,25 +103,12 @@
   }
 
   function currentElements() {
-    let edges = allConnections.filter(e => relation==="all" || e.kind===relation);
-    let nodeIds;
-    if (mode==="explore") {
-      const primary = edges.filter(e => e.source===focus || e.target===focus)
-        .filter(e => enabledTypes.has(byId.get(otherEnd(e,focus)).type))
-        .sort((a,b) => b.priority-a.priority || a.id.localeCompare(b.id));
-      const uniq=[], found=new Set();
-      for(const e of primary) {
-        const id=otherEnd(e,focus);
-        if(!found.has(id)) { found.add(id); uniq.push(id); }
-      }
-      nodeIds=new Set([focus,...uniq.slice(0,shownLimit)]);
-      edges=edges.filter(e=>nodeIds.has(e.source)&&nodeIds.has(e.target));
-    } else {
-      nodeIds=new Set(atlas.nodes.filter(n=>enabledTypes.has(n.type)||n.id===focus).map(n=>n.id));
-      edges=edges.filter(e=>nodeIds.has(e.source)&&nodeIds.has(e.target));
-    }
-    const nodes=atlas.nodes.filter(n=>nodeIds.has(n.id));
-    return {nodes,edges};
+    const eligible=new Set(atlas.nodes.filter(n=>enabledTypes.has(n.type)||n.id===focus).map(n=>n.id));
+    const edges=allConnections.filter(e =>
+      (relation==="all"||e.kind===relation) && eligible.has(e.source) && eligible.has(e.target));
+    const visible=relation==="all" ? eligible :
+      new Set([focus,...edges.flatMap(e=>[e.source,e.target])]);
+    return {nodes:atlas.nodes.filter(n=>visible.has(n.id)),edges};
   }
 
   function semanticGroup(node) {
@@ -240,7 +222,14 @@
   function frameGraph(){
     if(!cy || !cy.nodes().length)return;
     cy.resize();
-    cy.fit(cy.nodes(),mode==="overview"?75:98);
+    // Show the entire network while keeping the opening focus at the canvas center.
+    const bbox=cy.nodes().boundingBox({includeLabels:true,includeOverlays:false});
+    const point=cy.$id(focus).position();
+    const rx=Math.max(Math.abs(bbox.x1-point.x),Math.abs(bbox.x2-point.x),120);
+    const ry=Math.max(Math.abs(bbox.y1-point.y),Math.abs(bbox.y2-point.y),120);
+    const zoom=Math.min(1.15,(cy.width()-60)/(rx*2+60),(cy.height()-60)/(ry*2+60));
+    cy.zoom(Math.max(cy.minZoom(),zoom));
+    cy.center(cy.$id(focus));
   }
 
   function renderGraph() {
@@ -270,26 +259,53 @@
     highlightSelection(currentSelection);
   }
 
+  let recenterTimer=null;
+  function recenterOn(id,animate=true) {
+    if(!cy)return;
+    const element=cy.$id(id);
+    if(!element.length)return;
+    cy.resize();
+    const targetZoom=Math.min(1.05,Math.max(cy.zoom(),window.innerWidth<650?.63:.78));
+    cy.stop();
+    if(animate){
+      cy.animate({center:{eles:element},zoom:targetZoom},{duration:560,easing:"ease-in-out-cubic"});
+    } else {
+      cy.zoom(targetZoom); cy.center(element);
+    }
+  }
+
   function updateBreadcrumbs() {
     $("pathList").innerHTML=history.map((id,i)=>'<button class="crumb '+(i===history.length-1?"current":"")+'" data-path="'+i+'">'+escapeHtml(byId.get(id)?.title||id)+'</button>'+(i<history.length-1?'<span class="crumb-sep">›</span>':"")).join("");
   }
 
   function setPanelOpen(open) {
+    const wasClosed=$("detailPanel").classList.contains("closed");
     $("detailPanel").classList.toggle("closed",!open);
     document.documentElement.classList.toggle("panel-open",open);
-    if(cy) { setTimeout(()=>{cy.resize();cy.fit(cy.elements(),mode==="overview"?70:95);if(open&&window.innerWidth>900)cy.panBy({x:-95,y:0});},40); }
+    if(recenterTimer)clearTimeout(recenterTimer);
+    recenterTimer=setTimeout(()=>{
+      if(!cy)return;
+      cy.resize();
+      if(open && currentSelection?.type==="node") recenterOn(currentSelection.id,true);
+    },wasClosed&&open?320:35);
   }
 
   function highlightSelection(sel) {
     if(!cy)return;
     cy.elements().removeClass("active dimmed");
     if(!sel)return;
-    let element=cy.$id(sel.id);
-    if(!element || !element.length)return;
-    element.addClass("active");
-    if(sel.type==="edge") {
-      const ends=element.connectedNodes();
-      ends.addClass("active");
+    const element=cy.$id(sel.id);
+    if(!element.length)return;
+    if(sel.type==="node"){
+      cy.elements().addClass("dimmed");
+      const adjacent=element.connectedEdges();
+      element.removeClass("dimmed").addClass("active");
+      adjacent.removeClass("dimmed").addClass("active");
+      adjacent.connectedNodes().removeClass("dimmed");
+    } else {
+      cy.elements().addClass("dimmed");
+      element.removeClass("dimmed").addClass("active");
+      element.connectedNodes().removeClass("dimmed").addClass("active");
     }
   }
 
@@ -307,7 +323,7 @@
       '<div class="media-hero" id="heroMedia"><span class="art-fallback">'+escapeHtml(initials(node.title))+'</span></div>'+
       '<h2 class="panel-title">'+escapeHtml(node.title)+'</h2><p class="panel-subtitle">'+escapeHtml(node.subtitle || node.year || "")+'</p>'+
       '<p class="panel-summary">'+escapeHtml(node.description)+'</p>'+
-      '<button class="primary-btn" data-focus="'+node.id+'">Esplora le connessioni <span>↗</span></button>'+
+      '<button class="primary-btn" data-focus="'+node.id+'">Centra nella mappa <span>◎</span></button>'+
       (node.videoId?'<span class="section-label">GUARDA</span><div id="mediaSlot"><button class="video-thumb" data-video="'+escapeHtml(node.videoId)+'"><span class="video-play">▶</span><span><strong>'+escapeHtml(node.videoLabel||"Riproduci video")+'</strong><br>Player YouTube integrato · clicca per caricare</span></button></div>':'')+
       (related?'<span class="section-label">CONNESSIONI · '+neighbors.length+'</span><div class="related-list">'+related+'</div>':'')+
       (id===focus && mode==="explore" ? moreConnectionsMarkup() : "")+
@@ -448,25 +464,25 @@
 
   function navigateTo(id,fromHistory=false) {
     if(!byId.has(id))return;
+    const previous=focus;
     focus=id;
     if(!fromHistory){
       const existing=history.indexOf(id);
-      history=existing>=0 ? history.slice(0,existing+1) : [...history,id].slice(-7);
+      history=existing>=0 ? history.slice(0,existing+1) : [...history,id].slice(-12);
     }
-    mode="explore";shownLimit=12;
-    updateViewButtons();
-    renderGraph();showNode(id);
+    if(cy){
+      cy.nodes().removeClass("focus");
+      cy.$id(id).addClass("focus");
+      const old=physicsNodes.get(previous);
+      if(old && previous!==id){old.fx=null;old.fy=null;}
+      const point=physicsNodes.get(id);
+      if(point){point.fx=point.x;point.fy=point.y;}
+      if(simulation)simulation.alpha(.14).restart();
+    }
+    updateBreadcrumbs();
+    showNode(id);
   }
 
-  function updateViewButtons() {
-    $("exploreMode").classList.toggle("active",mode==="explore");
-    $("overviewMode").classList.toggle("active",mode==="overview");
-    $("exploreMode").setAttribute("aria-pressed",mode==="explore");
-    $("overviewMode").setAttribute("aria-pressed",mode==="overview");
-  }
-  function changeMode(next) {
-    mode=next;updateViewButtons();renderGraph();
-  }
   function changeRelation(next) {
     relation=next;shownLimit=12;
     document.querySelectorAll(".filter-chip").forEach(b=>{
@@ -496,9 +512,13 @@
   }
 
   function bindUi() {
-    $("brandHome").addEventListener("click",e=>{e.preventDefault();focus="pulp";history=["pulp"];mode="explore";relation="all";enabledTypes=new Set(types);shownLimit=12;renderDomains();updateViewButtons();changeRelation("all");showNode("pulp")});
-    $("exploreMode").addEventListener("click",()=>changeMode("explore"));
-    $("overviewMode").addEventListener("click",()=>changeMode("overview"));
+    $("brandHome").addEventListener("click",e=>{
+      e.preventDefault();
+      relation="all";enabledTypes=new Set(types);
+      renderDomains();changeRelation("all");
+      navigateTo("pulp");history=["pulp"];updateBreadcrumbs();
+      frameGraph();
+    });
     document.querySelectorAll(".filter-chip").forEach(b=>b.addEventListener("click",()=>changeRelation(b.dataset.rel)));
     $("domainToggle").addEventListener("click",()=>{const m=$("domainMenu");m.hidden=!m.hidden;$("domainToggle").setAttribute("aria-expanded",String(!m.hidden));});
     $("domainMenu").addEventListener("change",e=>{
@@ -529,9 +549,9 @@
     $("detailContent").addEventListener("click",e=>{
       const b=e.target.closest("[data-action],[data-focus],[data-node],[data-video]");if(!b)return;
       if(b.dataset.focus)navigateTo(b.dataset.focus);
-      else if(b.dataset.node)showNode(b.dataset.node);
+      else if(b.dataset.node)navigateTo(b.dataset.node);
       else if(b.dataset.action==="close")setPanelOpen(false);
-      else if(b.dataset.action==="more"){shownLimit+=8;renderGraph();showNode(focus);}
+
       else if(b.dataset.video){
         const id=b.dataset.video;
         if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
@@ -541,7 +561,7 @@
     });
     $("zoomIn").addEventListener("click",()=>cy?.zoom({level:Math.min(cy.zoom()*1.25,2.2),renderedPosition:{x:cy.width()/2,y:cy.height()/2}}));
     $("zoomOut").addEventListener("click",()=>cy?.zoom({level:Math.max(cy.zoom()/1.25,.17),renderedPosition:{x:cy.width()/2,y:cy.height()/2}}));
-    $("fitGraph").addEventListener("click",()=>cy?.fit(cy.elements(),90));
+    $("fitGraph").addEventListener("click",()=>{if(cy)frameGraph();});
     $("dismissHint").addEventListener("click",()=>$("mapHint").hidden=true);
     $("helpBtn").addEventListener("click",()=>$("helpDialog").showModal());
     $("closeHelp").addEventListener("click",()=>$("helpDialog").close());
