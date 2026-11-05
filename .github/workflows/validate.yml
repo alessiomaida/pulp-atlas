@@ -1,0 +1,33 @@
+name: Validate prototype
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          node --check app.js
+          node --check data.js
+      - name: Verify node and relationship integrity
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          const assert = require('node:assert/strict');
+          const context = { window: {} };
+          vm.runInNewContext(fs.readFileSync('data.js','utf8'), context);
+          const { nodes, links } = context.window.ATLAS;
+          const ids = new Set(nodes.map(n => n.id));
+          assert.equal(ids.size,nodes.length,'Duplicate node IDs');
+          for(const e of links) {
+            assert(ids.has(e.source), 'Unknown source: '+e.source);
+            assert(ids.has(e.target), 'Unknown target: '+e.target);
+            assert(e.detail && e.sourceUrl, 'Missing relationship context: '+e.id);
+          }
+          console.log(nodes.length+' nodes and '+links.length+' sourced relationships verified');
+          NODE
