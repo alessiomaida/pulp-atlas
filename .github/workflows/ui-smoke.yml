@@ -7,6 +7,7 @@ on:
       - "app.js"
       - "styles.css"
       - "data.js"
+      - "extended-data.js"
       - "tests/smoke.mjs"
       - ".github/workflows/ui-smoke.yml"
   workflow_dispatch:
