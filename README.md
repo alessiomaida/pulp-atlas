@@ -13,17 +13,17 @@ A map-first cultural discovery prototype starting from **Pulp Fiction (1994)**, 
 - **Typed relationships**: references/use, credits/collaborations, documented influences.
 - **Search** across titles, people and disciplines.
 - **Category filters** and a breadcrumb trail for backtracking.
-- **Click a node** to view contextual notes and adjacent connections.
+- **Drag any node**: a D3 force simulation moves adjacent nodes elastically, with collision spacing to reduce overlaps.\n- **Click a node** to view contextual notes and adjacent connections.
 - **Click an edge** to see *why* two things are connected and open supporting sources.
 - **Explore from here** to make another node the focus.
-- **Media panel** with Wikipedia thumbnails loaded on demand and a privacy-enhanced embedded YouTube trailer; embeds only load after a user click.
+- **Image-rich graph**: Wikipedia article thumbnails (including movie/poster art where supplied) are loaded in batches; Wikimedia Commons search supplies additional images. If no matching image is found, a readable category illustration remains. Thumbnails are external URLs; nothing is uploaded to the repository.\n- **Media panel** with the same images and privacy-enhanced embedded YouTube clips; video players load only after a user click.
 - Responsive desktop/mobile layout.
 
 The seed dataset is curated and incomplete; individual connections should be critically reviewed and expanded. The source URL attached to each relationship is a starting point for verification, not a claim that every source is primary.
 
 ## Tech stack
 
-Static HTML + CSS + vanilla JavaScript, with Cytoscape.js loaded from jsDelivr. **No backend, API keys, database, package manager, or build stage.**
+Static HTML + CSS + vanilla JavaScript, with Cytoscape.js and D3 Force loaded from jsDelivr. **No backend, API keys, database, package manager, or build stage.**
 
 - `index.html`: application structure
 - `styles.css`: responsive cinematic map interface
@@ -60,6 +60,6 @@ Then visit http://localhost:8000. An Internet connection is required for the Cyt
 - Load remote media on demand and do not bundle copyrighted movie clips or audio files.
 - Wikipedia thumbnails and external media remain subject to their original licenses and providers' embed policies.
 
-## Next iteration
+## Browser verification\n\nGitHub Actions runs a JavaScript/data integrity check and a Chromium smoke test. The browser test attempts node dragging, overview rendering, and mobile layout; screenshots are attached as GitHub Actions artifacts. The page can be opened with \`?debug=1\` for read-only graph diagnostics.\n\n**Important:** GitHub Pages is publicly accessible even if you intend to use the atlas only personally. Wikipedia thumbnails can have different rights, including non-free cover art. Confirm usage permissions and attribution before promoting the site to a public audience. The prototype avoids copying media files.\n\n## Next iteration
 
 Improve visual node thumbnails, add clustered and hierarchical layouts, richer media embeds (Vimeo and authorized audio players), sources per individual assertion, media-license review, timeline filters and saved paths. A data-quality pass should precede large-scale AI-assisted enrichment.
