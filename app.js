@@ -283,7 +283,11 @@
     $("detailPanel").classList.toggle("closed",!open);
     document.documentElement.classList.toggle("panel-open",open);
     if(recenterTimer)clearTimeout(recenterTimer);
-    if(initialPanelRender){initialPanelRender=false;return;}
+    if(initialPanelRender){
+      initialPanelRender=false;
+      setTimeout(()=>{if(cy)frameGraph();},120);
+      return;
+    }
     recenterTimer=setTimeout(()=>{
       if(!cy)return;
       cy.resize();
