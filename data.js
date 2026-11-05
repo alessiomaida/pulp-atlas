@@ -6,7 +6,7 @@ window.ATLAS = (() => {
     credits: "https://www.imdb.com/title/tt0110912/fullcredits/",
     soundtrack: "https://cinecensura.com/wp-content/uploads/1994/05/Pulp-Fiction-Dialoghi-Originali.pdf",
     archive: "https://wiki.tarantino.info/index.php/Pulp_Fiction_Movie_References_Guide",
-    references: "https://slate.com/culture/2015/09/quentin-tarantino-influences-and-references-every-inspiration-for-pulp-fiction.html",
+    references: "https://www.slate.com/blogs/browbeat/2015/09/01/quentin_tarantino_influences_and_references_every_inspiration_for_pulp_fiction.html",
     modesty: "https://www.imdb.com/title/tt0110912/faq/",
     movieclips: "https://www.youtube.com/watch?v=s7EdQ4FqbhY"
   };
