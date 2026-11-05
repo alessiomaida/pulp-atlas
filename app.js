@@ -59,6 +59,7 @@
           "background-color":"#533d31","font-size":16,"font-weight":700,"text-margin-y":15,
           "shadow-blur":22,"shadow-color":"#e4b36c","shadow-opacity":.18,"shadow-offset-x":0,"shadow-offset-y":0}},
         {selector:"node.photo",style:{"background-color":"#292b2c","border-width":3.5}},
+        {selector:"node.lowzoom",style:{"label":""}},
         {selector:"node.active",style:{"border-width":5,"border-color":"#f0d1a0"}},
         {selector:"edge",style:{
           "width":2,"line-color":"data(color)","opacity":.58,"curve-style":"bezier",
@@ -95,6 +96,25 @@
       point.fx=null;point.fy=null;
       simulation.alphaTarget(0).alpha(.19).restart();
     });
+    let compactLabels=false;
+    const updateLabels=(force=false)=>{
+      const compact=cy.zoom()<.48;
+      if(!force&&compact===compactLabels)return;
+      compactLabels=compact;
+      cy.batch(()=>{
+        cy.nodes().forEach(node=>{
+          if(compact&&!node.hasClass("focus")&&!node.hasClass("hovered"))node.addClass("lowzoom");
+          else node.removeClass("lowzoom");
+        });
+      });
+    };
+    cy.on("zoom",()=>updateLabels());
+    cy.on("mouseover","node",e=>e.target.addClass("hovered").removeClass("lowzoom"));
+    cy.on("mouseout","node",e=>{
+      e.target.removeClass("hovered");
+      if(cy.zoom()<.48&&!e.target.hasClass("focus"))e.target.addClass("lowzoom");
+    });
+    // One complete map: node click moves the camera rather than replacing the graph.
     cy.on("tap","node", ev => navigateTo(ev.target.id()));
     cy.on("tap","edge", ev => showEdge(ev.target.id()));
     cy.on("mouseover","node, edge",()=>{$("graph").style.cursor="grab"});
@@ -257,6 +277,7 @@
     $("edgeStat").textContent=edges.length+" collegamenti";
     updateBreadcrumbs();
     highlightSelection(currentSelection);
+    cy.emit("zoom");
   }
 
   let recenterTimer=null, initialPanelRender=true;
@@ -492,7 +513,8 @@
     }
     if(cy){
       cy.nodes().removeClass("focus");
-      cy.$id(id).addClass("focus");
+      cy.$id(id).addClass("focus").removeClass("lowzoom");
+      if(cy.zoom()<.48)cy.nodes().not("#"+id).not(".hovered").addClass("lowzoom");
       const old=physicsNodes.get(previous);
       if(old && previous!==id){old.fx=null;old.fy=null;}
       const point=physicsNodes.get(id);
