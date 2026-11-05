@@ -12,7 +12,8 @@
   let shownLimit = 12, enabledTypes = new Set(types), currentSelection = {type:"node",id:"pulp"};
   let searchMatches = [], lastTap = {id:"",at:0};
   let simulation = null, physicsNodes = new Map(), syncingPhysics = false;
-  let imageLoadPromise = null, fitTimeout = null;
+  let imageLoadPromise = null;
+  const imageOrigins = new Map();
 
   const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g,c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const getColor = type => atlas.categories[type]?.color || "#99a2ac";
@@ -323,23 +324,102 @@
     return hidden ? '<button class="secondary-btn" data-action="more">Mostra altre '+Math.min(8,hidden)+' connessioni nella mappa →</button>' : "";
   }
 
-  async function loadImage(node,box) {
-    if(!node.wiki || !box) return;
-    if(imageCache.has(node.wiki)){if(imageCache.get(node.wiki))insertImage(box,imageCache.get(node.wiki));return;}
-    try{
-      const url="https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=pageimages&piprop=thumbnail&pithumbsize=720&titles="+encodeURIComponent(decodeURIComponent(node.wiki));
-      const response=await fetch(url,{mode:"cors"});
-      if(!response.ok)throw Error("Image lookup failed");
-      const json=await response.json(),page=Object.values(json.query?.pages||{})[0];
-      const src=page?.thumbnail?.source || null;
-      imageCache.set(node.wiki,src);
-      if(src && box.isConnected && currentSelection?.id===node.id) insertImage(box,src);
-    }catch(e){imageCache.set(node.wiki,null);}
+  function updateVisualImage(node,src,origin) {
+    if(!src || !/^https:\/\//.test(src))return;
+    imageCache.set(node.id,src);
+    imageOrigins.set(node.id,origin);
+    const element=cy?.$id(node.id);
+    if(element?.length){element.data("image",src);element.addClass("photo");}
+    if(currentSelection?.type==="node" && currentSelection.id===node.id){
+      const hero=$("heroMedia");
+      if(hero)insertImage(hero,src,node,origin);
+    }
   }
-  function insertImage(box,src){
-    box.innerHTML='<img src="'+escapeHtml(src)+'" alt="Immagine illustrativa" loading="lazy" referrerpolicy="no-referrer"><span class="media-credit">Wikipedia</span>';
+
+  async function fetchWikipediaImages() {
+    const wikiNodes=atlas.nodes.filter(n=>n.wiki);
+    const titleOf=n=>decodeURIComponent(n.wiki).replace(/_/g," ");
+    const key=s=>String(s).replace(/_/g," ").trim().toLocaleLowerCase();
+    const params=new URLSearchParams({
+      action:"query",format:"json",formatversion:"2",origin:"*",
+      redirects:"1",prop:"pageimages",piprop:"thumbnail",
+      pithumbsize:"360",pilicense:"any",
+      titles:[...new Set(wikiNodes.map(titleOf))].join("|")
+    });
+    const response=await fetch("https://en.wikipedia.org/w/api.php?"+params,{mode:"cors"});
+    if(!response.ok)throw new Error("Wikipedia image API unavailable");
+    const json=await response.json();
+    const aliases=new Map();
+    for(const pair of [...(json.query?.normalized||[]),...(json.query?.redirects||[])])
+      aliases.set(key(pair.from),key(pair.to));
+    const pageByTitle=new Map((json.query?.pages||[]).map(page=>[key(page.title),page]));
+    for(const node of wikiNodes){
+      let title=key(titleOf(node));
+      for(let i=0;i<4&&aliases.has(title);i++)title=aliases.get(title);
+      const page=pageByTitle.get(title);
+      const src=page?.thumbnail?.source;
+      if(src)updateVisualImage(node,src,"Wikipedia");
+    }
+  }
+
+  async function fetchCommonsFallback(node) {
+    // A second source when the Wikipedia article has no lead thumbnail.
+    // Avoid unrelated matches: only use Commons file titles matching key terms.
+    const terms=node.title.replace(/·.+$/,"").replace(/[^\p{L}\p{N} ]/gu," ").trim();
+    if(terms.length<4)return;
+    const params=new URLSearchParams({
+      action:"query",format:"json",formatversion:"2",origin:"*",
+      generator:"search",gsrsearch:'"'+terms+'"',
+      gsrnamespace:"6",gsrlimit:"8",
+      prop:"imageinfo",iiprop:"url|mime",iiurlwidth:"360"
+    });
+    try{
+      const response=await fetch("https://commons.wikimedia.org/w/api.php?"+params,{mode:"cors"});
+      if(!response.ok)return;
+      const json=await response.json();
+      const words=terms.toLocaleLowerCase().split(/\s+/).filter(w=>w.length>2);
+      const candidates=(json.query?.pages||[]).filter(page=>{
+        const title=page.title.toLocaleLowerCase();
+        const hits=words.filter(w=>title.includes(w)).length;
+        return hits>=Math.min(2,words.length);
+      });
+      const best=candidates.find(p=>{
+        const mime=p.imageinfo?.[0]?.mime||"";
+        return ["image/jpeg","image/png","image/webp"].includes(mime) &&
+               (p.imageinfo?.[0]?.thumburl||p.imageinfo?.[0]?.url);
+      });
+      const src=best?.imageinfo?.[0]?.thumburl||best?.imageinfo?.[0]?.url;
+      if(src)updateVisualImage(node,src,"Wikimedia Commons");
+    }catch(e){/* Keep the accessible editorial icon as fallback. */}
+  }
+
+  async function preloadNodeImages() {
+    try {await fetchWikipediaImages();}
+    catch(e){console.warn("Immagini Wikipedia non disponibili",e);}
+    // Commons requests are rate-limited by concurrency; thumbnails are not stored here.
+    const remaining=atlas.nodes.filter(n=>n.wiki && !imageCache.has(n.id));
+    let next=0;
+    const count=Math.min(3,remaining.length);
+    await Promise.all(Array.from({length:count},async()=>{
+      while(next<remaining.length){
+        const node=remaining[next++];
+        await fetchCommonsFallback(node);
+      }
+    }));
+  }
+
+  async function loadImage(node,box) {
+    if(!node.wiki||!box)return;
+    if(!imageCache.has(node.id) && imageLoadPromise)await imageLoadPromise;
+    const src=imageCache.get(node.id);
+    if(src && box.isConnected && currentSelection?.id===node.id)
+      insertImage(box,src,node,imageOrigins.get(node.id)||"Wikipedia");
+  }
+
+  function insertImage(box,src,node,origin) {
+    box.innerHTML='<img src="'+escapeHtml(src)+'" alt="Immagine di '+escapeHtml(node.title)+'" loading="lazy"><span class="media-credit">'+escapeHtml(origin)+'</span>';
     const img=box.querySelector("img");
-    img.onerror=()=>{box.innerHTML='<span class="art-fallback">◈</span>';};
+    img.onerror=()=>{box.innerHTML='<span class="art-fallback">'+escapeHtml(initials(node.title))+'</span>';};
   }
 
   function showEdge(id) {
@@ -475,4 +555,5 @@
   renderDomains();
   renderGraph();
   showNode("pulp");
+  imageLoadPromise=preloadNodeImages();
 })();
