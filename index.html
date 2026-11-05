@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.4/dist/cytoscape.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" defer></script>
   <script src="./data.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
@@ -64,7 +65,7 @@
 
         <div class="map-hint" id="mapHint">
           <span class="hint-mark">↗</span>
-          <span>Seleziona un nodo o una linea per scoprirne la storia. Doppio clic su un nodo per esplorarlo.</span>
+          <span>Trascina un nodo: gli altri reagiscono come una rete elastica. Clicca i nodi o le linee per esplorare.</span>
           <button id="dismissHint" aria-label="Chiudi suggerimento">×</button>
         </div>
 
