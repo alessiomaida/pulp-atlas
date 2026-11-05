@@ -408,6 +408,10 @@
         await fetchCommonsFallback(node);
       }
     }));
+    // No suitable portrait for Peter O'Donnell was returned. Use artwork of his
+    // creation, clearly identified as such rather than implying it is a portrait.
+    if(!imageCache.has("odonnell") && imageCache.has("modestycomic"))
+      updateVisualImage(byId.get("odonnell"),imageCache.get("modestycomic"),"Opera correlata · Modesty Blaise");
   }
 
   async function loadImage(node,box) {
@@ -419,7 +423,7 @@
   }
 
   function insertImage(box,src,node,origin) {
-    box.innerHTML='<img src="'+escapeHtml(src)+'" alt="Immagine di '+escapeHtml(node.title)+'" loading="lazy"><span class="media-credit">'+escapeHtml(origin)+'</span>';
+    box.innerHTML='<img src="'+escapeHtml(src)+'" alt="'+escapeHtml(origin.startsWith("Opera correlata") ? "Opera collegata a "+node.title : "Immagine di "+node.title)+'" loading="lazy"><span class="media-credit">'+escapeHtml(origin)+'</span>';
     const img=box.querySelector("img");
     img.onerror=()=>{box.innerHTML='<span class="art-fallback">'+escapeHtml(initials(node.title))+'</span>';};
   }
