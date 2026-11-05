@@ -563,6 +563,7 @@
     window.__pulpAtlasDebug={
       state:()=>({mode,focus,nodes:cy?.nodes().length||0,edges:cy?.edges().length||0,
         loadedImages:imageCache.size,simulation:!!simulation}),
+      missingImages:()=>atlas.nodes.filter(n=>!imageCache.has(n.id)).map(n=>({id:n.id,title:n.title,wiki:n.wiki})),
       position:id=>cy?.$id(id).position(),
       screenPosition:id=>cy?.$id(id).renderedPosition()
     };
