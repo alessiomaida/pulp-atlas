@@ -1,0 +1,38 @@
+name: Browser smoke test
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "app.js"
+      - "styles.css"
+      - "data.js"
+      - "tests/smoke.mjs"
+      - ".github/workflows/ui-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser test runner
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run local static server
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/pulp-atlas-server.log 2>&1 &
+      - name: Validate visual interaction and capture screens
+        run: node tests/smoke.mjs
+      - name: Attach browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-screenshots
+          path: test-results/
+          if-no-files-found: ignore
