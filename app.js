@@ -109,6 +109,7 @@
       });
     };
     cy.on("zoom",()=>updateLabels());
+    cy.on("graph-refresh",()=>updateLabels(true));
     cy.on("mouseover","node",e=>e.target.addClass("hovered").removeClass("lowzoom"));
     cy.on("mouseout","node",e=>{
       e.target.removeClass("hovered");
@@ -277,7 +278,7 @@
     $("edgeStat").textContent=edges.length+" collegamenti";
     updateBreadcrumbs();
     highlightSelection(currentSelection);
-    cy.emit("zoom");
+    cy.emit("graph-refresh");
   }
 
   let recenterTimer=null, initialPanelRender=true;
