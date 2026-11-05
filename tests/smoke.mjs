@@ -20,7 +20,8 @@ try {
   await page.click("#overviewMode");
   await page.waitForTimeout(1100);
   const overview=await page.evaluate(()=>window.__pulpAtlasDebug.state());
-  assert.equal(overview.nodes,38,"Overview node count unexpected");
+  const datasetCount=await page.evaluate(()=>window.ATLAS.nodes.length);
+  assert.equal(overview.nodes,datasetCount,"Overview node count unexpected");
   await page.screenshot({path:"test-results/overview-desktop.png"});
 
   // Drag the focal node: neighbors must respond while the pointer is held.
