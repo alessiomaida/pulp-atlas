@@ -74,6 +74,7 @@
     });
     // Cytoscape handles pointer position; D3 handles the elastic response.
     cy.on("grab","node", ev => {
+      $("graph").style.cursor="grabbing";
       const point=physicsNodes.get(ev.target.id());
       if(!point || !simulation)return;
       point.fx=point.x;point.fy=point.y;
@@ -88,6 +89,7 @@
       simulation.alpha(Math.max(simulation.alpha(),.22)).restart();
     });
     cy.on("free","node", ev => {
+      $("graph").style.cursor="grab";
       const point=physicsNodes.get(ev.target.id());
       if(!point || !simulation)return;
       point.fx=null;point.fy=null;
@@ -100,7 +102,7 @@
       lastTap = {id,at:now};
     });
     cy.on("tap","edge", ev => showEdge(ev.target.id()));
-    cy.on("mouseover","node, edge",()=>{$("graph").style.cursor="pointer"});
+    cy.on("mouseover","node, edge",()=>{$("graph").style.cursor="grab"});
     cy.on("mouseout","node, edge",()=>{$("graph").style.cursor="grab"});
     cy.on("tap",ev=>{ if(ev.target===cy) highlightSelection(null) });
   }
@@ -211,7 +213,7 @@
     simulation=d3.forceSimulation(points)
       .force("links",d3.forceLink(links).id(d=>d.id)
         .distance(e=>isOverview?(e.source.id==="pulp"||e.target.id==="pulp"?370:260):340)
-        .strength(e=>isOverview?((e.source.id==="pulp"||e.target.id==="pulp")?.095:.23):.22))
+        .strength(e=>isOverview ? ((e.source.id==="pulp"||e.target.id==="pulp") ? .095 : .23) : .22))
       .force("repulsion",d3.forceManyBody()
         .strength(isOverview?-1080:-790).distanceMax(1300))
       .force("spacing",d3.forceCollide()
@@ -556,4 +558,13 @@
   renderGraph();
   showNode("pulp");
   imageLoadPromise=preloadNodeImages();
+  // Read-only diagnostics for browser smoke tests; enabled only with ?debug=1.
+  if(new URLSearchParams(location.search).get("debug")==="1"){
+    window.__pulpAtlasDebug={
+      state:()=>({mode,focus,nodes:cy?.nodes().length||0,edges:cy?.edges().length||0,
+        loadedImages:imageCache.size,simulation:!!simulation}),
+      position:id=>cy?.$id(id).position(),
+      screenPosition:id=>cy?.$id(id).renderedPosition()
+    };
+  }
 })();
