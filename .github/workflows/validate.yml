@@ -13,6 +13,7 @@ jobs:
         run: |
           node --check app.js
           node --check data.js
+          node --check extended-data.js
       - name: Verify node and relationship integrity
         run: |
           node <<'NODE'
@@ -21,9 +22,12 @@ jobs:
           const assert = require('node:assert/strict');
           const context = { window: {} };
           vm.runInNewContext(fs.readFileSync('data.js','utf8'), context);
+          vm.runInNewContext(fs.readFileSync('extended-data.js','utf8'), context);
           const { nodes, links } = context.window.ATLAS;
           const ids = new Set(nodes.map(n => n.id));
           assert.equal(ids.size,nodes.length,'Duplicate node IDs');
+          assert(nodes.length > 75, 'Extended data was not loaded');
+          assert(links.length > 100, 'Not enough sourced relationships');
           for(const e of links) {
             assert(ids.has(e.source), 'Unknown source: '+e.source);
             assert(ids.has(e.target), 'Unknown target: '+e.target);
