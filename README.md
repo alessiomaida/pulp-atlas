@@ -1,65 +1,58 @@
-# Pulp Atlas · prototype 01
+# Pulp Atlas — Interactive Cultural Graph
 
-A map-first cultural discovery prototype starting from **Pulp Fiction (1994)**, connecting cinema, music, people, television, books and comics.
+Map-first prototype for navigating the cultural connections around **Pulp Fiction (1994)**.
 
-**Repository:** https://github.com/alessiomaida/pulp-atlas
+**Live:** https://alessiomaida.github.io/pulp-atlas/  
+**Source:** https://github.com/alessiomaida/pulp-atlas
 
-**Planned public URL:** https://alessiomaida.github.io/pulp-atlas/ (only after GitHub Pages is enabled).
+## What it does
 
-## What works
+- **One persistent, complete graph:** no Explore/Overview split. All eligible nodes and edges stay in memory.
+- **Focus on click:** select any node to center it in the canvas, zoom into its neighbourhood and highlight immediate relationships. Unrelated nodes remain in the wider map.
+- **Drag and discover:** elastic D3 force simulation, collision avoidance and interactive panning/zooming.
+- **Zoom-aware labels:** distant nodes prioritize thumbnails over unreadable text. Hover or zoom in for labels.
+- **Filters:** credits, references, influences and cultural disciplines.
+- **Detailed connection cards:** click an edge to see an explanation and its cited source.
+- **Media:** Wikipedia/Commons thumbnails, clickable external sources and embedded YouTube content.
+- **Backtracking:** breadcrumb navigation along the user's exploration path.
 
-- **Explore**: a focused, progressive graph around one cultural work or person.
-- **Overview**: a map of the entire sample graph.
-- **Typed relationships**: references/use, credits/collaborations, documented influences.
-- **Search** across titles, people and disciplines.
-- **Category filters** and a breadcrumb trail for backtracking.
-- **Drag any node**: a D3 force simulation moves adjacent nodes elastically, with collision spacing to reduce overlaps.\n- **Click a node** to view contextual notes and adjacent connections.
-- **Click an edge** to see *why* two things are connected and open supporting sources.
-- **Explore from here** to make another node the focus.
-- **Image-rich graph**: Wikipedia article thumbnails (including movie/poster art where supplied) are loaded in batches; Wikimedia Commons search supplies additional images. If no matching image is found, a readable category illustration remains. Thumbnails are external URLs; nothing is uploaded to the repository.\n- **Media panel** with the same images and privacy-enhanced embedded YouTube clips; video players load only after a user click.
-- Responsive desktop/mobile layout.
+The current **seed corpus contains 110 nodes and 133 typed relationships** spanning films, actors, crew, songs, artists, literature, comics, television, and cultural references. It is an illustrative editorial corpus, not an exhaustive list of all references in the film.
 
-The seed dataset is curated and incomplete; individual connections should be critically reviewed and expanded. The source URL attached to each relationship is a starting point for verification, not a claim that every source is primary.
+### Important distinction
 
-## Tech stack
+- A **credit** is a factual production/cast relationship.
+- A **reference** can be a visible/audible use, an explicit mention, or a *critical parallel clearly described as such*.
+- An **influence** should be documented by credible source material.
 
-Static HTML + CSS + vanilla JavaScript, with Cytoscape.js and D3 Force loaded from jsDelivr. **No backend, API keys, database, package manager, or build stage.**
+The text and source URL attached to an edge should explain which of those claims is being made. Sources cited by the current sample vary in authority and should be audited before treating the corpus as a research-grade knowledge base.
 
-- `index.html`: application structure
-- `styles.css`: responsive cinematic map interface
-- `data.js`: typed editorial nodes, links, annotations, sources
-- `app.js`: graph rendering, interaction, filters, search and media
+## Codebase
 
-For this first version, static JS is more straightforward than introducing React/Vite. If the prototype proves useful, the same model can be migrated into a component-based frontend.
+No backend, sign-in, database or API key.
 
-## Publishing on GitHub Pages (one-time)
+- `index.html` — document and application shell
+- `styles.css` — responsive map layout
+- `data.js` — initial editorial dataset
+- `extended-data.js` — expanded sourced credits, music and cultural relationships
+- `app.js` — Cytoscape.js and D3 interactions, filters, image loading, panels
+- `tests/smoke.mjs` — browser checks for initial centering, complete graph, click-to-center, dragging and mobile viewport
 
-1. Open **Settings → Pages** in this repository.
-2. Under **Build and deployment**, select **Deploy from a branch**.
-3. Select branch **main** and folder **/(root)**, then **Save**.
-4. Allow GitHub to build the site; open https://alessiomaida.github.io/pulp-atlas/.
+JavaScript libraries are loaded from public CDNs. Wikipedia/Commons images and YouTube players are fetched externally; media are not copied into the repository. Some articles have no appropriate thumbnail, so category illustrations may be shown.
 
-All CSS and JS URLs are relative (`./`), so the site works under `/pulp-atlas/`. Subsequent commits to main update the site.
+## Run / deploy
 
-## Local preview
-
-Open `index.html` from a local static HTTP server:
+Use a local web server:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Then visit http://localhost:8000. An Internet connection is required for the Cytoscape CDN, Wikipedia images, Google Fonts, and YouTube embed.
+Then open http://localhost:8000/. GitHub Pages deploys automatically from `main` to the live URL above.
 
-## Content principles
+Both JavaScript integrity validation and browser smoke tests run in GitHub Actions. Browser screenshots are available in the test run artifacts.
 
-- Differentiate **entities** (films, people, songs, books) from **relationships** (citation, credit, influence).
-- A cultural relationship must have its **own description and source**.
-- Avoid presenting visual resemblance as proven historical influence.
-- Default to local exploration; do not render every node at once.
-- Load remote media on demand and do not bundle copyrighted movie clips or audio files.
-- Wikipedia thumbnails and external media remain subject to their original licenses and providers' embed policies.
+## Next steps
 
-## Browser verification\n\nGitHub Actions runs a JavaScript/data integrity check and a Chromium smoke test. The browser test attempts node dragging, overview rendering, and mobile layout; screenshots are attached as GitHub Actions artifacts. The page can be opened with \`?debug=1\` for read-only graph diagnostics.\n\n**Important:** GitHub Pages is publicly accessible even if you intend to use the atlas only personally. Wikipedia thumbnails can have different rights, including non-free cover art. Confirm usage permissions and attribution before promoting the site to a public audience. The prototype avoids copying media files.\n\n## Next iteration
+Improve visual clustering and label density for larger networks, add stronger provenance with per-assertion evidence and image attribution, and extend beyond the initial film. Prefer validated editorial expansion over generating unsupported reference claims.
 
-Improve visual node thumbnails, add clustered and hierarchical layouts, richer media embeds (Vimeo and authorized audio players), sources per individual assertion, media-license review, timeline filters and saved paths. A data-quality pass should precede large-scale AI-assisted enrichment.
+**Copyright:** GitHub Pages is publicly accessible even if used primarily for personal experimentation. An image available on Wikipedia is not necessarily Creative Commons; verify individual image licences before promoting or redistributing the site.
