@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111317" />
+  <meta name="description" content="Pulp Atlas: esplora le connessioni culturali tra film, musica, fumetti, libri e persone." />
+  <title>Pulp Atlas — Explore the connections</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.4/dist/cytoscape.min.js" defer></script>
+  <script src="./data.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" id="brandHome" aria-label="Torna a Pulp Fiction">
+        <span class="brand-symbol">✳</span>
+        <span class="brand-name">PULP <span>ATLAS</span></span>
+        <span class="brand-beta">PROTOTYPE / 01</span>
+      </a>
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.7"/><path d="m16 16 5 5"/></svg>
+        <input id="search" type="search" placeholder="Cerca film, musiche, persone, riferimenti…" autocomplete="off" aria-label="Cerca nell'atlante" />
+        <span class="shortcut">/</span>
+        <div id="searchResults" class="search-results" role="listbox" hidden></div>
+      </div>
+      <div class="header-actions">
+        <span class="header-status"><i></i> Dataset editoriale</span>
+        <button class="icon-btn" id="helpBtn" title="Come funziona" aria-label="Come funziona">?</button>
+      </div>
+    </header>
+
+    <main class="atlas">
+      <div class="controlbar" aria-label="Filtri della mappa">
+        <div class="control-group view-tabs" role="group" aria-label="Modalità">
+          <button id="exploreMode" class="tab active" aria-pressed="true"><span class="tab-icon">◎</span> Esplora</button>
+          <button id="overviewMode" class="tab" aria-pressed="false"><span class="tab-icon">⠿</span> Panoramica</button>
+        </div>
+        <span class="control-divider"></span>
+        <div class="control-group rel-group" role="group" aria-label="Tipo di connessione">
+          <button class="filter-chip selected" data-rel="all" aria-pressed="true">Tutte le relazioni</button>
+          <button class="filter-chip" data-rel="reference" aria-pressed="false"><span class="dot gold"></span> Riferimenti</button>
+          <button class="filter-chip" data-rel="credit" aria-pressed="false"><span class="dot blue"></span> Credits</button>
+          <button class="filter-chip" data-rel="influence" aria-pressed="false"><span class="dot purple"></span> Influenze</button>
+        </div>
+        <div class="filter-more-wrap">
+          <button class="filter-more" id="domainToggle" aria-expanded="false">Ambiti <span id="domainCount">Tutti</span> <span class="chev">⌄</span></button>
+          <div id="domainMenu" class="domain-menu" hidden></div>
+        </div>
+      </div>
+
+      <section class="map-stage" aria-label="Mappa interattiva delle connessioni">
+        <div class="stage-grid"></div>
+        <div id="graph" role="application" aria-label="Grafo interattivo: clicca sui nodi per leggere e sulle connessioni per scoprirne la fonte"></div>
+
+        <div class="path-panel">
+          <div class="eyebrow">IL TUO PERCORSO <span class="path-tip">↳ clicca per tornare</span></div>
+          <div id="pathList" class="path-list"></div>
+        </div>
+
+        <div class="map-hint" id="mapHint">
+          <span class="hint-mark">↗</span>
+          <span>Seleziona un nodo o una linea per scoprirne la storia. Doppio clic su un nodo per esplorarlo.</span>
+          <button id="dismissHint" aria-label="Chiudi suggerimento">×</button>
+        </div>
+
+        <div class="map-controls">
+          <button class="map-control" id="zoomIn" title="Zoom avanti" aria-label="Zoom avanti">+</button>
+          <button class="map-control" id="zoomOut" title="Zoom indietro" aria-label="Zoom indietro">−</button>
+          <button class="map-control map-fit" id="fitGraph" title="Centra la mappa" aria-label="Centra la mappa">⤢</button>
+        </div>
+
+        <div class="map-footer">
+          <div class="stats"><span id="nodeStat">0 nodi</span> <span class="bullet">•</span> <span id="edgeStat">0 collegamenti</span></div>
+          <div class="legend">
+            <span><i class="legend-dot film"></i> Cinema</span>
+            <span><i class="legend-dot music"></i> Musica</span>
+            <span><i class="legend-dot person"></i> Persone</span>
+            <span><i class="legend-dot book"></i> Libri / fumetti</span>
+          </div>
+        </div>
+
+        <aside id="detailPanel" class="detail-panel" aria-live="polite" aria-label="Dettaglio selezione">
+          <div id="detailContent"></div>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="helpDialog" class="help-dialog">
+    <div class="help-head"><span class="eyebrow">COME SI NAVIGA</span><button class="icon-btn" id="closeHelp" aria-label="Chiudi">×</button></div>
+    <h2>Ogni opera apre un altro mondo.</h2>
+    <p>La mappa mostra una porzione della rete culturale, non tutti i dati contemporaneamente. Parti da <strong>Pulp Fiction</strong> e segui citazioni, musiche, crediti e influenze.</p>
+    <div class="help-row"><span>01</span><p><strong>Clicca un nodo</strong> per leggere dettagli, immagini e contenuti multimediali.</p></div>
+    <div class="help-row"><span>02</span><p><strong>Clicca una linea</strong> per conoscere il motivo della connessione e aprire la fonte.</p></div>
+    <div class="help-row"><span>03</span><p><strong>Esplora da qui</strong> o fai doppio clic su un nodo per rifocalizzare la rete. Il percorso rimane visibile.</p></div>
+    <div class="help-row"><span>04</span><p><strong>Filtra</strong> per credits, riferimenti, influenze o disciplina. Usa Panoramica per vedere la rete completa.</p></div>
+    <button class="primary-btn" id="startExploring">Inizia a esplorare →</button>
+  </dialog>
+</body>
+</html>
