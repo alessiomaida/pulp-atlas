@@ -53,7 +53,8 @@ try {
 
   // Remote Wikipedia/Commons may be unavailable; report coverage, don't fail the map.
   const coverage=await page.evaluate(()=>window.__pulpAtlasDebug.state().loadedImages);
-  console.log(JSON.stringify({initial,overview,dragMoved:movement(before.pulp,held.pulp),neighborMoved:movement(before.neighbor,held.neighbor),loadedImages:coverage}));
+  const missingImages=await page.evaluate(()=>window.__pulpAtlasDebug.missingImages());
+  console.log(JSON.stringify({initial,overview,dragMoved:movement(before.pulp,held.pulp),neighborMoved:movement(before.neighbor,held.neighbor),loadedImages:coverage,missingImages}));
   assert.deepEqual(failures,[],"Page script errors: "+failures.join("; "));
 } finally {
   await browser.close();
