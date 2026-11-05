@@ -11,6 +11,8 @@
   let cy, mode = "explore", relation = "all", focus = "pulp", history = ["pulp"];
   let shownLimit = 12, enabledTypes = new Set(types), currentSelection = {type:"node",id:"pulp"};
   let searchMatches = [], lastTap = {id:"",at:0};
+  let simulation = null, physicsNodes = new Map(), syncingPhysics = false;
+  let imageLoadPromise = null, fitTimeout = null;
 
   const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g,c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const getColor = type => atlas.categories[type]?.color || "#99a2ac";
@@ -37,13 +39,14 @@
       container: $("graph"), elements:[],
       wheelSensitivity:.20, minZoom:.17, maxZoom:2.2,
       boxSelectionEnabled:false,
-      autoungrabify:true,
+      autoungrabify:false,
+      autounselectify:true,
       style:[
         {selector:"node",style:{
           "shape":"ellipse","width":68,"height":68,"border-width":2.5,
           "border-color":"data(color)","background-color":"#2a3036",
-          "background-image":"data(icon)","background-fit":"contain",
-          "background-image-opacity":.95,
+          "background-image":"data(image)","background-fit":"cover",
+          "background-image-opacity":1,"background-image-crossorigin":"anonymous",
           "label":"data(label)","font-family":"DM Sans, Arial, sans-serif",
           "font-size":12.5,"font-weight":600,"color":"#e9e9e6",
           "text-valign":"bottom","text-halign":"center","text-margin-y":12,
@@ -54,6 +57,7 @@
         {selector:"node.focus",style:{"width":90,"height":90,"border-width":4,"border-color":"#e4b36c",
           "background-color":"#533d31","font-size":16,"font-weight":700,"text-margin-y":15,
           "shadow-blur":22,"shadow-color":"#e4b36c","shadow-opacity":.18,"shadow-offset-x":0,"shadow-offset-y":0}},
+        {selector:"node.photo",style:{"background-color":"#292b2c","border-width":3.5}},
         {selector:"node.active",style:{"border-width":5,"border-color":"#f0d1a0"}},
         {selector:"edge",style:{
           "width":2,"line-color":"data(color)","opacity":.58,"curve-style":"bezier",
@@ -66,6 +70,27 @@
         {selector:"edge.dimmed",style:{"opacity":.16}},
         {selector:"node.dimmed",style:{"opacity":.4}}
       ]
+    });
+    // Cytoscape handles pointer position; D3 handles the elastic response.
+    cy.on("grab","node", ev => {
+      const point=physicsNodes.get(ev.target.id());
+      if(!point || !simulation)return;
+      point.fx=point.x;point.fy=point.y;
+      simulation.alphaTarget(.24).restart();
+    });
+    cy.on("drag","node", ev => {
+      const point=physicsNodes.get(ev.target.id());
+      if(!point || !simulation)return;
+      const pos=ev.target.position();
+      point.fx=pos.x;point.fy=pos.y;
+      point.x=pos.x;point.y=pos.y;
+      simulation.alpha(Math.max(simulation.alpha(),.22)).restart();
+    });
+    cy.on("free","node", ev => {
+      const point=physicsNodes.get(ev.target.id());
+      if(!point || !simulation)return;
+      point.fx=null;point.fy=null;
+      simulation.alphaTarget(0).alpha(.19).restart();
     });
     cy.on("tap","node", ev => {
       const id = ev.target.id(), now = Date.now();
@@ -101,44 +126,141 @@
     return {nodes,edges};
   }
 
-  function positionsFor(nodes) {
-    const p={};
-    if(mode==="explore") {
+  function semanticGroup(node) {
+    if(node.id==="pulp")return "center";
+    if(node.type==="music")return "music";
+    if(node.type==="book"||node.type==="comic")return "literature";
+    if(node.type==="tv")return "television";
+    if(node.type==="scene"||node.type==="film")return "cinema";
+    if(node.id==="madonna")return "music";
+    if(node.type==="person"){
+      const peers=getRelated(node.id).map(e=>byId.get(otherEnd(e,node.id)))
+        .filter(n=>n && n.id!=="pulp");
+      if(peers.some(n=>n.type==="music"))return "music";
+      if(peers.some(n=>n.type==="book"||n.type==="comic"))return "literature";
+      if(peers.some(n=>n.type==="tv"))return "television";
+    }
+    return "cinema";
+  }
+
+  const groupCenters={
+    center:{x:0,y:0},
+    cinema:{x:-390,y:-240},
+    music:{x:460,y:-150},
+    literature:{x:-440,y:400},
+    television:{x:320,y:450}
+  };
+
+  function seedPositions(nodes) {
+    const p={},groupCounts={};
+    if(mode==="explore"){
       p[focus]={x:0,y:0};
       const others=nodes.filter(n=>n.id!==focus).sort((a,b)=>
-        typeOrder[a.type]-typeOrder[b.type] || a.title.localeCompare(b.title));
+        typeOrder[a.type]-typeOrder[b.type]||a.title.localeCompare(b.title));
       others.forEach((n,i)=>{
-        const total=others.length;
-        const angle=-Math.PI/2 + i*Math.PI*2/Math.max(total,1);
-        const ring=total>10 && i%2===0 ? 270 : 225;
-        p[n.id]={x:Math.cos(angle)*ring,y:Math.sin(angle)*ring};
+        const theta=-Math.PI/2+i*2*Math.PI/Math.max(1,others.length);
+        const radius=330+(i%3)*48;
+        p[n.id]={x:Math.cos(theta)*radius,y:Math.sin(theta)*radius};
       });
     } else {
-      p[focus]={x:0,y:0};
-      const groups = Object.groupBy ? Object.groupBy(nodes.filter(n=>n.id!==focus),n=>n.type) : types.reduce((o,t)=>(o[t]=nodes.filter(n=>n.type===t&&n.id!==focus),o),{});
-      types.forEach((t,i)=>{
-        const group=groups[t]||[];
-        if(!group.length)return;
-        const a=-Math.PI/2+i*Math.PI*2/types.length,base={x:Math.cos(a)*510,y:Math.sin(a)*510};
-        group.forEach((n,j)=>{
-          const r=group.length===1?0:80+(j%2)*36,angle=2*Math.PI*j/group.length;
-          p[n.id]={x:base.x+r*Math.cos(angle),y:base.y+r*Math.sin(angle)};
-        });
+      nodes.forEach(n=>{
+        if(n.id===focus){p[n.id]={x:0,y:0};return;}
+        const group=semanticGroup(n),index=groupCounts[group]||0;
+        groupCounts[group]=index+1;
+        const anchor=groupCenters[group],angle=index*2.3999632297;
+        const radius=155*Math.sqrt(index+1);
+        p[n.id]={x:anchor.x+Math.cos(angle)*radius,
+                 y:anchor.y+Math.sin(angle)*radius};
       });
     }
     return p;
   }
 
+  function syncGraphFromPhysics() {
+    if(!cy||!physicsNodes.size)return;
+    syncingPhysics=true;
+    cy.batch(()=>{
+      for(const point of physicsNodes.values()){
+        const element=cy.$id(point.id);
+        if(element.length && Number.isFinite(point.x) && Number.isFinite(point.y))
+          element.position({x:point.x,y:point.y});
+      }
+    });
+    syncingPhysics=false;
+  }
+
+  function startPhysics(nodes,edges,initialPositions){
+    if(simulation){simulation.stop();simulation=null;}
+    physicsNodes.clear();
+    if(!window.d3) {
+      // Keeps the atlas usable if the physics CDN is temporarily unavailable.
+      cy.layout({name:"cose",animate:false,fit:true,padding:80,
+        nodeRepulsion:()=>190000,idealEdgeLength:()=>220,nodeOverlap:70}).run();
+      return;
+    }
+    const isOverview=mode==="overview";
+    const points=nodes.map(n=>{
+      const pos=initialPositions[n.id]||{x:0,y:0};
+      const point={id:n.id,x:pos.x,y:pos.y};
+      physicsNodes.set(n.id,point);
+      return point;
+    });
+    // Copy links: d3.forceLink mutates their source/target fields to objects.
+    const links=edges.map(e=>({source:e.source,target:e.target,kind:e.kind}));
+    simulation=d3.forceSimulation(points)
+      .force("links",d3.forceLink(links).id(d=>d.id)
+        .distance(e=>isOverview?(e.source.id==="pulp"||e.target.id==="pulp"?370:260):340)
+        .strength(e=>isOverview?((e.source.id==="pulp"||e.target.id==="pulp")?.095:.23):.22))
+      .force("repulsion",d3.forceManyBody()
+        .strength(isOverview?-1080:-790).distanceMax(1300))
+      .force("spacing",d3.forceCollide()
+        .radius(n=>n.id===focus?128:(isOverview?105:98)).strength(1).iterations(4))
+      .force("x",d3.forceX(n=>{
+        if(!isOverview)return 0;
+        return groupCenters[semanticGroup(byId.get(n.id))].x;
+      }).strength(n=>n.id===focus ? .11 : (isOverview ? .055 : .025)))
+      .force("y",d3.forceY(n=>{
+        if(!isOverview)return 0;
+        return groupCenters[semanticGroup(byId.get(n.id))].y;
+      }).strength(n=>n.id===focus ? .11 : (isOverview ? .055 : .025)))
+      .velocityDecay(.48)
+      .alphaDecay(.025)
+      .on("tick",syncGraphFromPhysics);
+    // Settle an initial non-overlapping layout before framing the map.
+    simulation.stop();
+    for(let i=0;i<(isOverview?240:170);i++)simulation.tick();
+    syncGraphFromPhysics();
+    // Resume with a low alpha for the gentle "breathing" effect.
+    simulation.alpha(.055).restart();
+  }
+
+  function frameGraph(){
+    if(!cy || !cy.nodes().length)return;
+    cy.resize();
+    cy.fit(cy.nodes(),mode==="overview"?75:98);
+  }
+
   function renderGraph() {
     if(!cy)return;
     const {nodes,edges}=currentElements();
-    const positions=positionsFor(nodes);
+    const positions=seedPositions(nodes);
+    if(simulation){simulation.stop();simulation=null;}
+    physicsNodes.clear();
     cy.elements().remove();
-    cy.add(nodes.map(n=>({group:"nodes",data:{id:n.id,label:n.title,color:getColor(n.type),icon:icons[n.type]},position:positions[n.id],classes:n.id===focus?"focus":""})));
-    cy.add(edges.map(e=>({group:"edges",data:{id:e.id,source:e.source,target:e.target,color:atlas.relations[e.kind].color},classes:e.kind})));
-    cy.layout({name:"preset",fit:true,padding:mode==="overview"?80:105,animate:false}).run();
-    cy.fit(cy.elements(),mode==="overview"?70:95);
-    if(window.innerWidth>900 && !$("detailPanel").classList.contains("closed")) cy.panBy({x:-95,y:0});
+    cy.add(nodes.map(n=>({
+      group:"nodes",
+      data:{id:n.id,label:n.title,color:getColor(n.type),
+        image:imageCache.get(n.id)||icons[n.type]},
+      position:positions[n.id],
+      classes:(n.id===focus?"focus ":"")+(imageCache.get(n.id)?"photo":"")
+    })));
+    cy.add(edges.map(e=>({
+      group:"edges",
+      data:{id:e.id,source:e.source,target:e.target,color:atlas.relations[e.kind].color},
+      classes:e.kind
+    })));
+    startPhysics(nodes,edges,positions);
+    frameGraph();
     $("nodeStat").textContent=nodes.length+" nodi";
     $("edgeStat").textContent=edges.length+" collegamenti";
     updateBreadcrumbs();
